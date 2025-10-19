@@ -1,9 +1,5 @@
 # Aegis - AI-Powered DAO Proposal Analysis Platform
 
-![Aegis Banner](https://img.shields.io/badge/Powered%20by-Gemini%20AI-4285F4?style=for-the-badge&logo=google)
-![Web3](https://img.shields.io/badge/Web3-Enabled-orange?style=for-the-badge)
-![React](https://img.shields.io/badge/React-18.3-61DAFB?style=for-the-badge&logo=react)
-
 ## 🎯 Introduction
 
 **Aegis** is a next-generation multi-agent AI system designed to revolutionize DAO governance by providing comprehensive, automated analysis of governance proposals. Built for the IQ AI Hackathon, Aegis combines the power of AI agents with real-time blockchain data to deliver actionable insights for DAO participants.
@@ -754,15 +750,6 @@ This project is built for the IQ AI Hackathon. See hackathon rules for usage ter
 - **Wagmi Team** - For excellent React hooks for Ethereum
 - **Snapshot Labs** - For governance data APIs
 - **The Graph** - For on-chain data indexing
-
-## 📞 Contact & Links
-
-- **Project Repository**: [GitHub Link]
-- **Live Demo**: [Deployment URL]
-- **Hackathon Submission**: [Submission Link]
-- **Documentation**: This README
-
----
 
 **Built with 💜 for the IQ AI Hackathon**
 
