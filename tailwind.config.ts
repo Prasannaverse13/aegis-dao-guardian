@@ -80,10 +80,42 @@ export default {
             height: "0",
           },
         },
+        "pulse-glow": {
+          "0%, 100%": {
+            boxShadow: "var(--glow-primary)",
+          },
+          "50%": {
+            boxShadow: "var(--glow-secondary)",
+          },
+        },
+        "gradient-shift": {
+          "0%": {
+            backgroundPosition: "0% 50%",
+          },
+          "50%": {
+            backgroundPosition: "100% 50%",
+          },
+          "100%": {
+            backgroundPosition: "0% 50%",
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "pulse-glow": "pulse-glow 3s ease-in-out infinite",
+        "gradient-shift": "gradient-shift 8s ease infinite",
+      },
+      backgroundImage: {
+        "gradient-primary": "var(--gradient-primary)",
+        "gradient-secondary": "var(--gradient-secondary)",
+        "gradient-accent": "var(--gradient-accent)",
+      },
+      boxShadow: {
+        "glow-primary": "var(--glow-primary)",
+        "glow-secondary": "var(--glow-secondary)",
+        "elevated": "var(--shadow-elevated)",
+        "card": "var(--shadow-card)",
       },
     },
   },
