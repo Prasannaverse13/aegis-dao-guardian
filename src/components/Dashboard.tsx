@@ -3,9 +3,11 @@ import { Shield, AlertTriangle, CheckCircle, Clock, ExternalLink, Sparkles } fro
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAccount, useDisconnect } from 'wagmi';
 import { toast } from 'sonner';
 import { AgentCard } from '@/components/AgentCard';
+import { TransactionSimulator } from '@/components/TransactionSimulator';
 import { AnalysisResult, AgentStatus, SAMPLE_PROPOSALS } from '@/types/analysis';
 import { ProposalAnalyzer } from '@/services/proposalAnalyzer';
 
@@ -149,6 +151,15 @@ const Dashboard = () => {
             </div>
           </div>
         </header>
+
+        {/* Main Tabs */}
+        <Tabs defaultValue="analysis" className="space-y-8">
+          <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto">
+            <TabsTrigger value="analysis">Proposal Analysis</TabsTrigger>
+            <TabsTrigger value="simulator">Transaction Simulator</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="analysis" className="space-y-8">
 
         {/* Multi-Agent System Status */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -412,6 +423,12 @@ const Dashboard = () => {
             </div>
           </Card>
         )}
+          </TabsContent>
+
+          <TabsContent value="simulator">
+            <TransactionSimulator />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
