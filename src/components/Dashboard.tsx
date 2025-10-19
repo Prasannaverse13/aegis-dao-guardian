@@ -1,23 +1,13 @@
 import { useState } from 'react';
-import { Shield, Search, TrendingUp, AlertTriangle, CheckCircle, Clock, ExternalLink } from 'lucide-react';
+import { Shield, AlertTriangle, CheckCircle, Clock, ExternalLink, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { useAccount, useDisconnect } from 'wagmi';
 import { toast } from 'sonner';
-
-interface AnalysisResult {
-  summary: string;
-  risks: Array<{ level: string; description: string }>;
-  benefits: string[];
-  financialData: {
-    requestedAmount: string;
-    treasuryImpact: string;
-  };
-  securityScore: number;
-  sentiment: string;
-  recommendation: string;
-}
+import { AgentCard } from '@/components/AgentCard';
+import { AnalysisResult, AgentStatus, SAMPLE_PROPOSALS } from '@/types/analysis';
+import { ProposalAnalyzer } from '@/services/proposalAnalyzer';
 
 const Dashboard = () => {
   const { address } = useAccount();
@@ -25,6 +15,57 @@ const Dashboard = () => {
   const [proposalUrl, setProposalUrl] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [expandedAgent, setExpandedAgent] = useState<string | null>(null);
+  
+  const [agents, setAgents] = useState<AgentStatus[]>([
+    {
+      id: 'orchestrator',
+      name: 'Orchestrator Agent',
+      role: 'Project Manager',
+      status: 'idle',
+      progress: 0,
+      findings: []
+    },
+    {
+      id: 'analyst',
+      name: 'Analyst Agent',
+      role: 'Strategist',
+      status: 'idle',
+      progress: 0,
+      findings: []
+    },
+    {
+      id: 'sentinel',
+      name: 'Sentinel Agent',
+      role: 'Security Specialist',
+      status: 'idle',
+      progress: 0,
+      findings: []
+    },
+    {
+      id: 'economist',
+      name: 'Economist Agent',
+      role: 'Financial Modeler',
+      status: 'idle',
+      progress: 0,
+      findings: []
+    }
+  ]);
+
+  const updateAgent = (agentId: string, updates: Partial<AgentStatus>) => {
+    setAgents(prev => prev.map(agent => 
+      agent.id === agentId ? { ...agent, ...updates } : agent
+    ));
+  };
+
+  const resetAgents = () => {
+    setAgents(prev => prev.map(agent => ({
+      ...agent,
+      status: 'idle',
+      progress: 0,
+      findings: []
+    })));
+  };
 
   const handleAnalyze = async () => {
     if (!proposalUrl.trim()) {
@@ -33,78 +74,28 @@ const Dashboard = () => {
     }
 
     setIsAnalyzing(true);
-    toast.info('Initializing multi-agent analysis system...');
+    setAnalysisResult(null);
+    resetAgents();
+    toast.info('🚀 Initializing multi-agent analysis system...');
 
     try {
-      // Simulate AI analysis with Gemini API
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const analyzer = new ProposalAnalyzer(updateAgent);
+      const result = await analyzer.analyze(proposalUrl);
       
-      const response = await fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyDWCgAHBZJFyyLJLMDkbxafv9ssJ4hfu2E',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  {
-                    text: `As an AI analyst for a DAO proposal analysis system, analyze this governance proposal URL: ${proposalUrl}. Provide a structured analysis including: 1) Executive Summary (2-3 sentences), 2) Key Risks (list 2-3 with severity levels), 3) Benefits (list 2-3 key benefits), 4) Financial Impact assessment, 5) Security Score (0-100), 6) Community Sentiment, and 7) Final Recommendation. Format as JSON with keys: summary, risks (array of {level, description}), benefits (array), financialData ({requestedAmount, treasuryImpact}), securityScore (number), sentiment, recommendation.`
-                  }
-                ]
-              }
-            ]
-          }),
-        }
-      );
-
-      const data = await response.json();
-      const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-      // Parse AI response (in production, this would be more robust)
-      let parsedResult: AnalysisResult;
-      try {
-        // Extract JSON from markdown code blocks if present
-        const jsonMatch = aiResponse.match(/```json\n([\s\S]*?)\n```/) || aiResponse.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          parsedResult = JSON.parse(jsonMatch[1] || jsonMatch[0]);
-        } else {
-          // Fallback mock data if parsing fails
-          throw new Error('Unable to parse AI response');
-        }
-      } catch {
-        parsedResult = {
-          summary: 'This proposal requests funding for protocol development. The Orchestrator Agent has coordinated analysis across Governance, On-Chain Analytics, and Security MCPs. Multi-agent consensus indicates moderate risk with strong technical foundation.',
-          risks: [
-            { level: 'Medium', description: 'Smart contract audit pending - security verification in progress' },
-            { level: 'Low', description: 'Treasury allocation exceeds 5% threshold - requires careful monitoring' },
-            { level: 'High', description: 'Limited community discussion - only 12 comments in 3 days' }
-          ],
-          benefits: [
-            'Experienced team with proven track record on similar protocols',
-            'Clear technical roadmap with quarterly milestones',
-            'Strong alignment with DAO mission and strategic objectives'
-          ],
-          financialData: {
-            requestedAmount: '250,000 USDC',
-            treasuryImpact: '6.2% of total treasury'
-          },
-          securityScore: 72,
-          sentiment: 'Cautiously Optimistic (67% positive, 21% neutral, 12% negative)',
-          recommendation: 'CONDITIONAL APPROVAL - Recommend approval contingent on completion of smart contract audit and increased community engagement period of 7 days.'
-        };
-      }
-
-      setAnalysisResult(parsedResult);
-      toast.success('Analysis complete!');
+      setAnalysisResult(result);
+      toast.success('✅ Multi-agent analysis complete!');
     } catch (error) {
       console.error('Analysis error:', error);
       toast.error('Analysis failed. Please try again.');
+      resetAgents();
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  const loadSampleProposal = (url: string) => {
+    setProposalUrl(url);
+    toast.info('Sample proposal loaded - click Analyze to begin');
   };
 
   const getRiskColor = (level: string) => {
@@ -159,44 +150,39 @@ const Dashboard = () => {
           </div>
         </header>
 
-        {/* Agent Status */}
-        <div className="grid grid-cols-3 gap-4 mb-8">
-          <Card className="p-4 bg-card/50 backdrop-blur-sm border-border shadow-card">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
-                <Shield className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Orchestrator Agent</p>
-                <p className="font-semibold text-green-400">Active</p>
-              </div>
-            </div>
-          </Card>
-          
-          <Card className="p-4 bg-card/50 backdrop-blur-sm border-border shadow-card">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Analyst Agent</p>
-                <p className="font-semibold text-green-400">Active</p>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-4 bg-card/50 backdrop-blur-sm border-border shadow-card">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
-                <Search className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">MCP Servers</p>
-                <p className="font-semibold text-green-400">3 Online</p>
-              </div>
-            </div>
-          </Card>
+        {/* Multi-Agent System Status */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          {agents.map((agent) => (
+            <AgentCard
+              key={agent.id}
+              agent={agent}
+              onClick={() => setExpandedAgent(expandedAgent === agent.id ? null : agent.id)}
+              isExpanded={expandedAgent === agent.id}
+            />
+          ))}
         </div>
+
+        {/* Sample Proposals */}
+        <Card className="p-6 mb-8 bg-card/50 backdrop-blur-sm border-border shadow-card">
+          <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-primary" />
+            Sample Test Proposals
+          </h2>
+          <div className="grid md:grid-cols-3 gap-3">
+            {SAMPLE_PROPOSALS.map((sample, idx) => (
+              <Button
+                key={idx}
+                variant="outline"
+                onClick={() => loadSampleProposal(sample.url)}
+                className="h-auto flex-col items-start text-left p-4 border-border hover:border-primary/50"
+                disabled={isAnalyzing}
+              >
+                <p className="font-semibold text-sm mb-1">{sample.title}</p>
+                <p className="text-xs text-muted-foreground">{sample.description}</p>
+              </Button>
+            ))}
+          </div>
+        </Card>
 
         {/* Input Section */}
         <Card className="p-6 mb-8 bg-card/50 backdrop-blur-sm border-border shadow-elevated">
@@ -221,15 +207,23 @@ const Dashboard = () => {
                 </>
               ) : (
                 <>
-                  <Search className="w-4 h-4 mr-2" />
+                  <Shield className="w-4 h-4 mr-2" />
                   Analyze
                 </>
               )}
             </Button>
           </div>
           <p className="text-xs text-muted-foreground mt-2">
-            Powered by Gemini AI • ADK-TS Multi-Agent System
+            Powered by Gemini AI • Multi-Agent Collaboration System
           </p>
+          <div className="mt-2 flex items-center gap-2 text-xs">
+            <span className="inline-flex items-center gap-1 text-muted-foreground">
+              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+              4 Agents Active
+            </span>
+            <span className="text-muted-foreground">•</span>
+            <span className="text-muted-foreground">Real-time Analysis</span>
+          </div>
         </Card>
 
         {/* Results */}
@@ -265,7 +259,7 @@ const Dashboard = () => {
 
               <Card className="p-6 bg-card/50 backdrop-blur-sm border-border shadow-card">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-primary" />
+                  <CheckCircle className="w-5 h-5 text-primary" />
                   Financial Impact
                 </h3>
                 <div className="space-y-4">
@@ -277,6 +271,12 @@ const Dashboard = () => {
                     <p className="text-sm text-muted-foreground mb-1">Treasury Impact</p>
                     <p className="text-xl font-semibold">{analysisResult.financialData.treasuryImpact}</p>
                   </div>
+                  {analysisResult.financialData.runwayReduction && (
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Treasury Runway</p>
+                      <p className="text-sm font-medium">{analysisResult.financialData.runwayReduction}</p>
+                    </div>
+                  )}
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">Security Score</p>
                     <div className="flex items-center gap-3">
@@ -308,6 +308,53 @@ const Dashboard = () => {
                 ))}
               </ul>
             </Card>
+
+            {/* Specialist Agent Reports */}
+            {(analysisResult.securityProfile || analysisResult.financialBrief) && (
+              <div className="grid md:grid-cols-2 gap-6">
+                {analysisResult.securityProfile && (
+                  <Card className="p-6 bg-card/50 backdrop-blur-sm border-border shadow-card">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <Shield className="w-5 h-5 text-red-400" />
+                      Sentinel Agent Report
+                    </h3>
+                    <div className="space-y-2 text-sm">
+                      <div>
+                        <p className="text-muted-foreground mb-1">Audit Status</p>
+                        <p className="font-medium">{analysisResult.securityProfile.auditStatus}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground mb-1">Wallet Age</p>
+                        <p className="font-medium">{analysisResult.securityProfile.walletAge}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground mb-1">Vulnerabilities</p>
+                        <p className="font-medium text-green-400">{analysisResult.securityProfile.vulnerabilities}</p>
+                      </div>
+                    </div>
+                  </Card>
+                )}
+
+                {analysisResult.financialBrief && (
+                  <Card className="p-6 bg-card/50 backdrop-blur-sm border-border shadow-card">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <CheckCircle className="w-5 h-5 text-green-400" />
+                      Economist Agent Report
+                    </h3>
+                    <div className="space-y-2 text-sm">
+                      <div>
+                        <p className="text-muted-foreground mb-1">Treasury Runway</p>
+                        <p className="font-medium">{analysisResult.financialBrief.treasuryRunway}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground mb-1">ROI Projection</p>
+                        <p className="font-medium text-green-400">{analysisResult.financialBrief.roiProjection}</p>
+                      </div>
+                    </div>
+                  </Card>
+                )}
+              </div>
+            )}
 
             {/* Sentiment & Recommendation */}
             <div className="grid md:grid-cols-2 gap-6">
@@ -341,10 +388,28 @@ const Dashboard = () => {
           <Card className="p-12 text-center bg-card/30 backdrop-blur-sm border-dashed border-2 border-border">
             <Shield className="w-16 h-16 mx-auto mb-4 text-primary/50" />
             <h3 className="text-xl font-semibold mb-2">Ready to Analyze</h3>
-            <p className="text-muted-foreground max-w-md mx-auto">
-              Enter a DAO governance proposal URL above to start the multi-agent analysis process.
-              Our AI agents will gather data from multiple sources and provide comprehensive insights.
+            <p className="text-muted-foreground max-w-md mx-auto mb-6">
+              Enter a DAO governance proposal URL or select a sample proposal to start the multi-agent analysis.
+              Our 4 specialist AI agents will collaborate to provide comprehensive insights.
             </p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-2xl mx-auto">
+              <div className="text-center p-3 rounded-lg bg-card/50 border border-border">
+                <Shield className="w-6 h-6 mx-auto mb-1 text-primary" />
+                <p className="text-xs text-muted-foreground">Orchestrator</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-card/50 border border-border">
+                <CheckCircle className="w-6 h-6 mx-auto mb-1 text-primary" />
+                <p className="text-xs text-muted-foreground">Analyst</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-card/50 border border-border">
+                <AlertTriangle className="w-6 h-6 mx-auto mb-1 text-primary" />
+                <p className="text-xs text-muted-foreground">Sentinel</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-card/50 border border-border">
+                <CheckCircle className="w-6 h-6 mx-auto mb-1 text-primary" />
+                <p className="text-xs text-muted-foreground">Economist</p>
+              </div>
+            </div>
           </Card>
         )}
       </div>
