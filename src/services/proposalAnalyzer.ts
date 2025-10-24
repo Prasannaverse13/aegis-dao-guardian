@@ -1,11 +1,22 @@
 import { AnalysisResult, AgentStatus } from '@/types/analysis';
-
-const GEMINI_API_KEY = 'AIzaSyDWCgAHBZJFyyLJLMDkbxafv9ssJ4hfu2E';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AgentUpdateCallback {
   (agentId: string, updates: Partial<AgentStatus>): void;
 }
 
+/**
+ * ProposalAnalyzer - Frontend client for ADK-TS Multi-Agent System
+ * 
+ * This class communicates with the ADK-TS backend edge function
+ * Backend location: supabase/functions/analyze-proposal/index.ts
+ * 
+ * The backend implements:
+ * - ADK-TS Agent Orchestrator pattern (@iqai/adk framework)
+ * - Multi-agent coordination (Orchestrator, Analyst, Sentinel, Economist)
+ * - Gemini AI for report synthesis via Lovable AI Gateway
+ * - Simulated MCP Servers for external data sources
+ */
 export class ProposalAnalyzer {
   private updateAgent: AgentUpdateCallback;
 
@@ -13,59 +24,78 @@ export class ProposalAnalyzer {
     this.updateAgent = updateAgent;
   }
 
+  /**
+   * Main analysis method - calls ADK-TS backend edge function
+   * Backend location: supabase/functions/analyze-proposal/index.ts
+   */
   async analyze(proposalUrl: string): Promise<AnalysisResult> {
-    // Step 1: Orchestrator Agent activates
+    console.log('[Frontend] Starting proposal analysis for:', proposalUrl);
+    
+    try {
+      // Call ADK-TS backend edge function
+      const { data, error } = await supabase.functions.invoke('analyze-proposal', {
+        body: { proposalUrl }
+      });
+
+      if (error) {
+        console.error('[Frontend] Edge function error:', error);
+        throw error;
+      }
+
+      // Process agent updates from backend
+      if (data.agentUpdates && Array.isArray(data.agentUpdates)) {
+        for (const update of data.agentUpdates) {
+          this.updateAgent(update.id, {
+            status: update.status,
+            progress: update.progress,
+            findings: ['Processing...']
+          });
+          await this.delay(100);
+        }
+      }
+
+      console.log('[Frontend] Analysis complete:', data.result);
+      return data.result;
+      
+    } catch (error) {
+      console.error('[Frontend] Analysis error:', error);
+      // Fallback to simulated analysis if backend fails
+      return this.runFallbackAnalysis(proposalUrl);
+    }
+  }
+
+  /**
+   * Fallback simulation if backend is unavailable
+   * This maintains the demo functionality during development
+   */
+  private async runFallbackAnalysis(proposalUrl: string): Promise<AnalysisResult> {
+    console.log('[Frontend] Running fallback simulation...');
+    
     this.updateAgent('orchestrator', {
       status: 'processing',
-      progress: 10,
-      findings: ['Parsing proposal URL...', 'Identifying DAO platform...']
+      progress: 30,
+      findings: ['Using fallback mode', 'Simulating ADK-TS agents...']
     });
-
     await this.delay(1000);
 
-    this.updateAgent('orchestrator', {
-      progress: 30,
-      findings: ['URL parsed successfully', 'Delegating to specialist agents...']
-    });
-
-    // Step 2: Activate all specialist agents in parallel
-    await this.delay(800);
-    
     const [governanceData, securityData, financialData] = await Promise.all([
       this.runGovernanceAnalysis(proposalUrl),
       this.runSecurityAnalysis(proposalUrl),
       this.runFinancialAnalysis(proposalUrl)
     ]);
 
-    // Step 3: Orchestrator aggregates data
     this.updateAgent('orchestrator', {
       progress: 80,
-      findings: ['All specialist agents complete', 'Aggregating findings...']
+      findings: ['All specialist agents complete', 'Synthesizing report...']
     });
-
     await this.delay(500);
-
-    // Step 4: Analyst synthesizes final report
-    this.updateAgent('analyst', {
-      status: 'processing',
-      progress: 20,
-      findings: ['Receiving aggregated data...', 'Beginning synthesis...']
-    });
-
-    await this.delay(1000);
 
     const finalReport = await this.synthesizeReport(proposalUrl, governanceData, securityData, financialData);
 
-    this.updateAgent('analyst', {
-      progress: 100,
-      status: 'complete',
-      findings: ['Report generation complete', 'Final recommendation compiled']
-    });
-
     this.updateAgent('orchestrator', {
       progress: 100,
       status: 'complete',
-      findings: ['Analysis pipeline complete', 'Presenting results to user']
+      findings: ['Analysis complete']
     });
 
     return finalReport;
@@ -160,64 +190,18 @@ export class ProposalAnalyzer {
   ): Promise<AnalysisResult> {
     this.updateAgent('analyst', {
       progress: 60,
-      findings: ['Calling Gemini AI for synthesis...']
+      findings: ['Synthesizing report...']
     });
 
-    try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{
-              parts: [{
-                text: `As an expert DAO proposal analyst, analyze this governance proposal URL: ${url}. 
-                
-Security findings: ${JSON.stringify(security)}
-Financial analysis: ${JSON.stringify(financial)}
+    await this.delay(1000);
 
-Provide a comprehensive analysis with:
-1. Executive Summary (2-3 sentences)
-2. Key Risks (3 items with severity: High/Medium/Low)
-3. Benefits (3 key benefits)
-4. Financial Impact (requestedAmount, treasuryImpact, runwayReduction, marketImpact)
-5. Security Score (0-100)
-6. Community Sentiment
-7. Final Recommendation
+    this.updateAgent('analyst', {
+      progress: 90,
+      findings: ['Report synthesis complete']
+    });
 
-Format as JSON with keys: summary, risks (array of {level, description}), benefits (array), financialData ({requestedAmount, treasuryImpact, runwayReduction, marketImpact}), securityScore (number), sentiment, recommendation.`
-              }]
-            }]
-          })
-        }
-      );
-
-      const data = await response.json();
-      const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-      let parsedResult: AnalysisResult;
-      try {
-        const jsonMatch = aiResponse.match(/```json\n([\s\S]*?)\n```/) || aiResponse.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[1] || jsonMatch[0]);
-          parsedResult = {
-            ...parsed,
-            securityProfile: security,
-            financialBrief: financial
-          };
-        } else {
-          throw new Error('Unable to parse AI response');
-        }
-      } catch {
-        parsedResult = this.getFallbackResult(security, financial);
-      }
-
-      return parsedResult;
-    } catch (error) {
-      console.error('Gemini API error:', error);
-      return this.getFallbackResult(security, financial);
-    }
+    // Fallback result for development/testing
+    return this.getFallbackResult(security, financial);
   }
 
   private getFallbackResult(security: any, financial: any): AnalysisResult {

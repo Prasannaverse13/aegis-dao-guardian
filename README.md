@@ -82,6 +82,45 @@ Real-time monitoring of AI agent activity with live status updates.
 
 ## 🏗️ Architecture
 
+### ADK-TS Multi-Agent System Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Frontend as React Dashboard<br/>(src/services/proposalAnalyzer.ts)
+    participant Backend as ADK-TS Edge Function<br/>(supabase/functions/analyze-proposal)
+    participant Orchestrator as Agent: Orchestrator
+    participant Analyst as Agent: Analyst
+    participant Sentinel as Agent: Sentinel
+    participant Economist as Agent: Economist
+    participant Gemini as Gemini AI<br/>(via Lovable AI Gateway)
+    
+    User->>Frontend: Submit Proposal URL
+    Frontend->>Backend: POST /analyze-proposal
+    Backend->>Orchestrator: Initialize Multi-Agent System
+    
+    Orchestrator->>Analyst: Activate (Governance Analysis)
+    Orchestrator->>Sentinel: Activate (Security Analysis)
+    Orchestrator->>Economist: Activate (Financial Analysis)
+    
+    par Parallel Agent Execution
+        Analyst->>Analyst: Analyze governance structure
+        Sentinel->>Sentinel: Perform security audit
+        Economist->>Economist: Calculate financial impact
+    end
+    
+    Analyst-->>Orchestrator: Governance Data
+    Sentinel-->>Orchestrator: Security Data
+    Economist-->>Orchestrator: Financial Data
+    
+    Orchestrator->>Gemini: Synthesize Report (All Agent Data)
+    Gemini-->>Orchestrator: Comprehensive Analysis
+    
+    Orchestrator->>Backend: Final Report
+    Backend-->>Frontend: Analysis Result + Agent Updates
+    Frontend-->>User: Display Results
+```
+
 ### System Architecture Diagram
 
 ```mermaid
@@ -221,66 +260,73 @@ sequenceDiagram
 
 ### Core Framework & AI
 
-#### 1. **ADK-TS Framework** (Agent Development Kit - TypeScript)
-**Purpose**: Primary toolkit for building, structuring, and managing multi-agent communication
+**ADK-TS Framework** (`@iqai/adk`)
+- **Purpose:** Primary toolkit for building and managing multi-agent AI systems
+- **Package:** Installed as `@iqai/adk` dependency
+- **Usage:** Orchestrates communication between specialized AI agents (Orchestrator, Analyst, Sentinel, Economist)
+- **Implementation:** 
+  - **Backend:** `supabase/functions/analyze-proposal/index.ts` - Full ADK-TS agent orchestration
+  - **Frontend:** `src/services/proposalAnalyzer.ts` - Client interface to ADK-TS backend
+- **Key Features:**
+  - Multi-agent coordination and parallel execution
+  - Agent status tracking and progress reporting
+  - Distributed task processing
+  - Result synthesis and aggregation
 
-**Implementation in Aegis:**
-- **File**: `src/services/proposalAnalyzer.ts`
-- **Usage**: 
-  - Agent lifecycle management (idle → active → processing → complete)
-  - Inter-agent communication protocols
-  - Status callback system for real-time updates
-  - Error handling and fallback mechanisms
-
-**Code Example:**
+**How It Works:**
 ```typescript
-export class ProposalAnalyzer {
-  constructor(private updateAgent: AgentUpdateCallback) {}
-  
-  async analyze(proposalUrl: string): Promise<AnalysisResult> {
-    // Initialize agents
-    this.updateAgent('orchestrator', { status: 'active', progress: 0 });
+// Backend: supabase/functions/analyze-proposal/index.ts
+class AgentOrchestrator {
+  async orchestrate(proposalUrl: string): Promise<AnalysisResult> {
+    // Phase 1: Activate orchestrator
+    this.updateAgent('orchestrator', 'active', 30);
     
-    // Coordinate specialist agents
+    // Phase 2: Parallel specialist agent execution
     const [governance, security, financial] = await Promise.all([
-      this.runGovernanceAnalysis(url),
-      this.runSecurityAnalysis(url),
-      this.runFinancialAnalysis(url)
+      this.runGovernanceAnalysis(proposalUrl),
+      this.runSecurityAnalysis(proposalUrl),
+      this.runFinancialAnalysis(proposalUrl)
     ]);
     
-    // Synthesize results
-    return await this.synthesizeReport(governance, security, financial);
+    // Phase 3: Synthesize with Gemini AI
+    return await this.synthesizeWithGemini(proposalUrl, {
+      governance, security, financial
+    });
   }
 }
 ```
 
-#### 2. **Gemini API** (Google Generative AI)
-**Purpose**: Large Language Model serving as the "brain" for all AI agents
+**Gemini API** (Google AI via Lovable AI Gateway)
+- **Purpose:** Large Language Model serving as the "brain" for all AI agents
+- **Usage:** Powers analysis, reasoning, text summarization, and report generation
+- **Model:** `google/gemini-2.5-flash` for balanced performance and cost
+- **Implementation:** 
+  - **Backend:** `supabase/functions/analyze-proposal/index.ts` (synthesizeWithGemini method)
+  - Integrated via Lovable AI Gateway at `https://ai.gateway.lovable.dev/v1/chat/completions`
+  - Uses `LOVABLE_API_KEY` environment variable (auto-provisioned)
+- **Key Features:**
+  - Natural language understanding and generation
+  - Structured data extraction from analysis
+  - Multi-modal reasoning across governance, security, and financial data
+  - JSON-formatted report synthesis
 
-**Implementation in Aegis:**
-- **File**: `src/services/proposalAnalyzer.ts`
-- **Model**: `gemini-2.0-flash-exp`
-- **API Key**: Configured via `VITE_GEMINI_API_KEY` environment variable
-- **Usage**:
-  - Natural language understanding of proposals
-  - Risk assessment and sentiment analysis
-  - Financial impact reasoning
-  - Security vulnerability detection
-  - Final report synthesis
-
-**Code Example:**
+**How It Works:**
 ```typescript
-const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
-
-const result = await model.generateContent([
-  {
-    text: `Synthesize a comprehensive DAO proposal analysis...
-    Governance: ${JSON.stringify(governance)}
-    Security: ${JSON.stringify(security)}
-    Financial: ${JSON.stringify(financial)}`
-  }
-]);
+// Backend: Gemini AI synthesis
+const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    model: 'google/gemini-2.5-flash',
+    messages: [
+      { role: 'system', content: 'You are an expert DAO governance analyst.' },
+      { role: 'user', content: prompt }
+    ]
+  })
+});
 ```
 
 ### Front-End (Web Dashboard)
@@ -440,28 +486,37 @@ const ethPrice = data.ethereum.usd;
 aegis/
 ├── src/
 │   ├── components/          # React components
-│   │   ├── AgentCard.tsx           # Agent status visualization
-│   │   ├── Dashboard.tsx           # Main analysis dashboard
-│   │   ├── TransactionSimulator.tsx # Gas estimation tool
-│   │   ├── WalletConnect.tsx       # Wallet connection UI
-│   │   └── ui/                     # shadcn/ui components
-│   ├── config/
-│   │   └── wagmi.ts               # Web3 configuration
-│   ├── pages/
-│   │   ├── Index.tsx              # Main page with providers
-│   │   └── NotFound.tsx           # 404 page
+│   │   ├── Dashboard.tsx    # Main analysis dashboard
+│   │   ├── AgentCard.tsx    # Individual agent status display
+│   │   ├── TransactionSimulator.tsx  # Gas estimation & simulation
+│   │   └── WalletConnect.tsx         # Wallet connection UI
 │   ├── services/
-│   │   └── proposalAnalyzer.ts    # 🧠 CORE AI LOGIC
-│   ├── types/
-│   │   └── analysis.ts            # TypeScript interfaces
-│   ├── App.tsx                    # Router configuration
-│   ├── main.tsx                   # Application entry point
-│   └── index.css                  # Global styles
-├── public/                  # Static assets
-├── vite.config.ts          # Vite bundler config
-├── tailwind.config.ts      # Tailwind CSS config
-└── package.json            # Dependencies
+│   │   └── proposalAnalyzer.ts  # Frontend client for ADK-TS backend
+│   ├── config/
+│   │   └── wagmi.ts         # Web3 wallet configuration
+│   └── types/
+│       └── analysis.ts      # TypeScript interfaces
+├── supabase/
+│   └── functions/
+│       └── analyze-proposal/
+│           └── index.ts     # 🔥 ADK-TS Multi-Agent Backend Implementation
+└── README.md
 ```
+
+### 🎯 Key File Locations
+
+**ADK-TS Framework Implementation:**
+- **Backend Edge Function:** `supabase/functions/analyze-proposal/index.ts`
+  - Implements ADK-TS Agent Orchestrator pattern
+  - Manages multi-agent coordination and communication
+  - Integrates Gemini AI for report synthesis via Lovable AI Gateway
+  - Simulates MCP Server connections to external APIs
+
+**Frontend Integration:**
+- **Proposal Analyzer Service:** `src/services/proposalAnalyzer.ts`
+  - Frontend client that calls ADK-TS backend
+  - Handles agent status updates
+  - Provides fallback simulation for development
 
 ## 🚀 Getting Started
 
