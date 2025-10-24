@@ -42,20 +42,9 @@ export class ProposalAnalyzer {
         throw error;
       }
 
-      // Process agent updates from backend
-      if (data.agentUpdates && Array.isArray(data.agentUpdates)) {
-        for (const update of data.agentUpdates) {
-          this.updateAgent(update.id, {
-            status: update.status,
-            progress: update.progress,
-            findings: ['Processing...']
-          });
-          await this.delay(100);
-        }
-      }
-
-      console.log('[Frontend] Analysis complete:', data.result);
-      return data.result;
+      // Backend now returns the transformed result directly
+      console.log('[Frontend] Analysis complete:', data);
+      return data;
       
     } catch (error) {
       console.error('[Frontend] Analysis error:', error);

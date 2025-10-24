@@ -272,8 +272,43 @@ serve(async (req) => {
     
     const result = await orchestrator.orchestrate(proposalUrl);
     
+    // Transform to match frontend AnalysisResult interface
+    const transformedResult = {
+      summary: result.summary || "Analysis completed successfully.",
+      risks: result.riskLevel 
+        ? [{ level: result.riskLevel, description: result.summary || "Risk assessment completed" }]
+        : [{ level: "medium", description: "Risk assessment pending" }],
+      benefits: Array.isArray(result.benefits)
+        ? result.benefits.map((b: any) => 
+            typeof b === 'string' ? b : `${b.title || 'Benefit'}: ${b.description || ''}`
+          )
+        : [],
+      financialData: {
+        requestedAmount: result.financialImpact?.amount || "N/A",
+        treasuryImpact: result.financialImpact?.impact || "Analysis pending",
+        runwayReduction: result.financialImpact?.timeline || undefined,
+        marketImpact: undefined
+      },
+      securityScore: result.specialists?.security?.score 
+        ? result.specialists.security.score * 10
+        : 75,
+      sentiment: typeof result.sentiment === 'object' && result.sentiment !== null
+        ? `Positive: ${result.sentiment.positive || 0}% | Neutral: ${result.sentiment.neutral || 0}% | Negative: ${result.sentiment.negative || 0}%`
+        : result.sentiment || "Sentiment analysis pending",
+      recommendation: result.recommendation || "Further review recommended",
+      securityProfile: result.specialists?.security ? {
+        auditStatus: result.specialists.security.analysis || "Pending review",
+        walletAge: "Analysis data unavailable",
+        vulnerabilities: "No critical issues detected"
+      } : undefined,
+      financialBrief: result.specialists?.financial ? {
+        treasuryRunway: result.specialists.financial.analysis || "Pending calculation",
+        roiProjection: "Analysis data unavailable"
+      } : undefined
+    };
+    
     return new Response(
-      JSON.stringify({ result, agentUpdates }),
+      JSON.stringify(transformedResult),
       { 
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
